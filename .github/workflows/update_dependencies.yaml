@@ -1,0 +1,32 @@
+name: Update Dependencies
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          payload="$(jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg repository_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --arg ssh_url "git@${GITHUB_SERVER_URL#https://}:$GITHUB_REPOSITORY.git" \
+            '{repository_name: $repository, repository_url: $repository_url, ssh_url: $ssh_url}')"
+
+          curl -fsS -X POST "${{ secrets.SENTINEL_UPDATE_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
