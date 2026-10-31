@@ -1,12 +1,10 @@
 mod bytes;
 mod http1_server;
 mod res_ext;
-mod shutdown;
 
 pub use self::bytes::*;
 pub use self::http1_server::*;
 pub use self::res_ext::*;
-pub use self::shutdown::*;
 
 // pub type HttpRequest = Request<Incoming>;
 // pub type HttpResponse = ResponseBuilder;
