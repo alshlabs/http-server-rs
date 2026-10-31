@@ -23,15 +23,18 @@ jobs:
       GITHUB_REPOSITORY: ${{ steps.generate.outputs.GITHUB_REPOSITORY }}
     steps:
       - id: generate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -ex
 
-          GITHUB_URL="https://api.github.com/repos/${{ github.repository }}"
-          LAST_VERSION=$(curl -sSL "$GITHUB_URL/releases/latest" | jq -r '.tag_name // empty')
+          LAST_VERSION=$(gh release list -R "${{ github.repository }}" --limit 1 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[0].tagName // empty')
 
           if [ -z "$LAST_VERSION" ]; then
             # No releases yet
-            NEW_VERSION="0.0.1"
+            # NEW_VERSION="0.0.1"
+            echo "FAILED TO GET VERSION"
+            exit 1
           else
             IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST_VERSION"
             NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
@@ -77,6 +80,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets --workspace -- -D warnings
 
+  check:
+    name: 🔨 Check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check
+
   # Due to platform differences I have opted out of using a matrix.
   # Examples;
   #   - Windows executables have different names
@@ -89,6 +101,7 @@ jobs:
       - format
       - lint
       - test
+      - check
     env:
       VERSION: ${{needs.version.outputs.VERSION}}
       GITHUB_REPOSITORY_NAME: ${{needs.version.outputs.GITHUB_REPOSITORY_NAME}}
@@ -119,6 +132,7 @@ jobs:
       - format
       - lint
       - test
+      - check
     env:
       VERSION: ${{needs.version.outputs.VERSION}}
       GITHUB_REPOSITORY_NAME: ${{needs.version.outputs.GITHUB_REPOSITORY_NAME}}
@@ -149,6 +163,7 @@ jobs:
       - format
       - lint
       - test
+      - check
     env:
       VERSION: ${{needs.version.outputs.VERSION}}
       GITHUB_REPOSITORY_NAME: ${{needs.version.outputs.GITHUB_REPOSITORY_NAME}}
@@ -177,6 +192,7 @@ jobs:
       - format
       - lint
       - test
+      - check
     env:
       VERSION: ${{needs.version.outputs.VERSION}}
       GITHUB_REPOSITORY_NAME: ${{needs.version.outputs.GITHUB_REPOSITORY_NAME}}
@@ -205,6 +221,7 @@ jobs:
       - format
       - lint
       - test
+      - check
     env:
       VERSION: ${{needs.version.outputs.VERSION}}
       GITHUB_REPOSITORY_NAME: ${{needs.version.outputs.GITHUB_REPOSITORY_NAME}}
