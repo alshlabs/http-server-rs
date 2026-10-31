@@ -198,12 +198,16 @@ async fn handle_request(
       .header("Cache-Control", "no-cache")
       .header("Connection", "keep-alive")
       .status(hyper::StatusCode::OK)
-      .body_stream_until_shutdown(config.stream_buffer_size, shutdown_signal)?;
+      .body_stream_until_shutdown(config.stream_buffer_size, shutdown_signal.clone())?;
 
     let mut rx = watcher.subscribe();
 
     tokio::task::spawn(async move {
-      while rx.changed().await.is_ok() {
+      while let Ok(()) = tokio::select! {
+        changed = rx.changed() => changed,
+        // Wakes once on shutdown, where the write fails because the body is gone
+        () = shutdown_signal.clone().wait_owned() => Ok(()),
+      } {
         let msg = format!(
           "data:{}\n\n",
           rx.borrow_and_update()

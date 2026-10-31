@@ -69,11 +69,17 @@ impl ResponseBuilderExt for ResponseBuilder {
     DuplexStream,
   )> {
     let (writer, reader) = tokio::io::duplex(stream_buffer_size);
+    let (_tx_kill, rx_kill) = tokio::sync::oneshot::channel::<()>();
 
     let reader_stream = tokio_util::io::ReaderStream::new(reader)
       .map_ok(Frame::data)
       .map_err(std::io::Error::other)
-      .take_until(shutdown_signal.wait_owned())
+      // Detatched from the writer so it ends on shutdown even while the writer
+      // side is still held open by a request task
+      .take_until(async move {
+        let _ = rx_kill.await;
+        shutdown_signal.wait_owned().await;
+      })
       // hyper treats an empty DATA frame as the end of stream
       .chain(stream::once(async { Ok(Frame::data(HyperBytes::new())) }));
 
