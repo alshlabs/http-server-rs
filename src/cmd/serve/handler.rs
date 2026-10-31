@@ -27,7 +27,6 @@ use crate::platform::explorer::RenderDirectoryExplorerConfig;
 use crate::platform::explorer::reload_script;
 use crate::platform::explorer::render_directory_explorer;
 use crate::platform::http1::ResponseBuilderExt;
-use crate::platform::http1::ShutdownSignal;
 use crate::platform::logger::Logger;
 use crate::platform::proxy::ProxyClient;
 use crate::platform::proxy::match_proxy_route;
@@ -50,13 +49,12 @@ pub async fn handle(
   req: Request<Incoming>,
   res: ResponseBuilder,
   state: Arc<ServeState>,
-  shutdown_signal: ShutdownSignal,
 ) -> anyhow::Result<Response<BoxBody<HyperBytes, std::io::Error>>> {
   let started = Instant::now();
   let logger = state.logger.clone();
   let uri = req.uri().clone();
 
-  let mut response = handle_request(req, res, state, shutdown_signal).await?;
+  let mut response = handle_request(req, res, state).await?;
 
   let size = response.body().size_hint().exact().unwrap_or_default();
   let status = response.status();
@@ -83,7 +81,6 @@ async fn handle_request(
   req: Request<Incoming>,
   mut res: ResponseBuilder,
   state: Arc<ServeState>,
-  shutdown_signal: ShutdownSignal,
 ) -> anyhow::Result<Response<BoxBody<HyperBytes, std::io::Error>>> {
   let config = state.config.clone();
   let logger = state.logger.clone();
@@ -196,9 +193,8 @@ async fn handle_request(
         format!("text/event-stream; {}", DEFAULT_CHARSET_SUFFIX),
       )
       .header("Cache-Control", "no-cache")
-      .header("Connection", "keep-alive")
       .status(hyper::StatusCode::OK)
-      .body_stream_until_shutdown(config.stream_buffer_size, shutdown_signal)?;
+      .body_stream(config.stream_buffer_size)?;
 
     let mut rx = watcher.subscribe();
 
