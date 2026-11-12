@@ -88,6 +88,12 @@ async fn handle_request(
   let proxy_client = state.proxy_client.clone();
   let scss_transformer = state.scss_transformer.clone();
   let typescript_transformer = state.typescript_transformer.clone();
+  let encoding = compress::negotiate(
+    req
+      .headers()
+      .get("accept-encoding")
+      .and_then(|value| value.to_str().ok()),
+  );
 
   // Basic Auth
   if !config.basic_auth.is_empty() {
@@ -349,11 +355,12 @@ async fn handle_request(
 
     let content_type = format!("text/css; {}", DEFAULT_CHARSET_SUFFIX);
 
-    if config.compress {
-      res = res.header("Content-Encoding", "br");
+    if config.compress && encoding == Some(compress::Encoding::Brotli) {
       return Ok(
         res
           .header("Content-Type", content_type)
+          .header("Content-Encoding", "br")
+          .header("Vary", "Accept-Encoding")
           .status(200)
           .body_from(compress::brotli(css.as_bytes()))?,
       );
@@ -392,11 +399,12 @@ async fn handle_request(
 
     let content_type = format!("application/javascript; {}", DEFAULT_CHARSET_SUFFIX);
 
-    if config.compress {
-      res = res.header("Content-Encoding", "br");
+    if config.compress && encoding == Some(compress::Encoding::Brotli) {
       return Ok(
         res
           .header("Content-Type", content_type)
+          .header("Content-Encoding", "br")
+          .header("Vary", "Accept-Encoding")
           .status(200)
           .body_from(compress::brotli(code.as_bytes()))?,
       );
@@ -430,19 +438,18 @@ async fn handle_request(
   }
 
   // If a .br or .gz file is found next to the target, serve that file
-  if !config.compress {
+  if !config.compress
+    && let Some(encoding) = encoding
+  {
     let Some(file_path_str) = file_path.to_str() else {
       return Ok(res.status(404).body_from("File not found")?);
     };
-    let brotli_path = PathBuf::from(format!("{}.br", file_path_str));
-    let gzip_path = PathBuf::from(format!("{}.gz", file_path_str));
-
-    if brotli_path.exists() {
-      file_path = brotli_path;
-      res = res.header("Content-Encoding", "br");
-    } else if gzip_path.exists() {
-      file_path = gzip_path;
-      res = res.header("Content-Encoding", "gzip");
+    let path = PathBuf::from(format!("{}.{}", file_path_str, encoding.name()));
+    if path.exists() {
+      file_path = path;
+      res = res
+        .header("Content-Encoding", encoding.name())
+        .header("Vary", "Accept-Encoding");
     }
   }
 
@@ -507,9 +514,14 @@ async fn handle_request(
     }
   }
 
-  if config.compress {
-    res = res.header("Content-Encoding", "br");
-    Ok(res.status(200).body_from(compress::brotli(&contents))?)
+  if config.compress && encoding == Some(compress::Encoding::Brotli) {
+    Ok(
+      res
+        .header("Content-Encoding", "br")
+        .header("Vary", "Accept-Encoding")
+        .status(200)
+        .body_from(compress::brotli(&contents))?,
+    )
   } else {
     Ok(res.status(200).body_from(contents)?)
   }
