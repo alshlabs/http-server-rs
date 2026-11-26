@@ -24,7 +24,7 @@ handlebars = "6.4.4"
 http = "1.5.0"
 http-body-util = "0.1.5"
 hyper = { version = "1.13.0", features = ["http1", "client"] }
-hyper-rustls = { version = "0.27", default-features = false, features = [
+hyper-rustls = { version = "0.27.10", default-features = false, features = [
   "aws-lc-rs",
   "http1",
   "native-tokio",
@@ -86,7 +86,7 @@ swc_core = { version = "85.1.1", features = [
   "ecma_transforms_typescript",
 ] }
 include_dir = "0.7.4"
-grass = { version = "0.13", default-features = false }
+grass = { version = "0.13.4", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 unix_mode = "0.1.4"
